@@ -1,0 +1,136 @@
+#!/usr/bin/env ruby
+
+$stdout.sync = true
+$stderr.sync = true
+
+require_relative '../lib/application'
+
+class QueWorker
+  attr_accessor :stop
+
+  def run
+    Que.error_notifier = self.class.method(:handle_error)
+    Que.log_formatter = self.class.method(:format_log)
+    Que.wake_interval = 1
+
+    # Set worker count first, since it determines the number of threads
+    # that will be created when we set mode `:async`.
+    Que.worker_count = Config.que_worker_count
+    # Start main 'wrangler' thread which manages the worker threads.
+    # The final result is that we have the following threads: main,
+    # wrangler, N(worker_count) threads. Or 2 + worker_count.
+    Que.mode = :async
+
+    set_exit_signals unless ENV["RACK_ENV"] == "test"
+
+    # note that this is just a sleep loop; work happens in a background
+    # thread
+    loop_until_signal
+  end
+
+  def self.format_log(data)
+    event = data[:event].to_sym
+
+    Pliny::Metrics.count "que.#{event}"
+
+    log_data = case event
+               when :job_errored
+                 job = data[:job][:job_class]
+                 common_log_data(job, data).merge({
+                   action:  "job_error",
+                   class:   data[:error][:class],
+                   message: data[:error][:message],
+                 })
+
+               when :job_unavailable
+                 { action: "wait_for_work" }
+
+               when :job_worked
+                 job = data[:job][:job_class]
+                 common_log_data(job, data).merge({
+                   action: "work_job",
+                   at:     "finish",
+                 })
+
+               when :mode_change
+                 { action: "mode_change", value: data[:value] }
+
+               when :worker_count_change
+                 { action: "worker_count_change", value: data[:value] }
+
+               end
+
+    log(log_data) if log_data
+    # send nothing to `Que.logger`
+    nil
+  end
+
+  def self.common_log_data(job, data)
+    log_context = {}
+    log_context.merge(
+      attempts:    (data[:job][:error_count] || 0) + 1,
+      elapsed:     data[:elapsed],
+      job:         job,
+      job_id:      data[:job][:job_id],
+      priority:    data[:job][:priority],
+      queue:       data[:job][:queue].empty? ? nil : data[:job][:queue],
+      thread:      data[:thread]
+    )
+  end
+
+  def self.handle_error(e, job)
+    Pliny::ErrorReporters.notify(e, context: { job: job })
+  end
+
+  private_class_method
+
+  def self.log(data={}, &block)
+    defaults = Hash[
+      self.to_s.underscore.split("/").map{ |e| [e, true] }
+    ]
+    Pliny.log(defaults.merge(data), &block)
+  end
+
+  private
+
+  def loop_until_signal
+    loop do
+      Kernel.sleep 0.1
+      break if stop
+    end
+  end
+
+  def log(data={}, &block)
+    self.class.log(data, &block)
+  end
+
+  def set_exit_signals
+    # Exit immediately, killing any in-flight jobs
+    trap('INT') do
+      log signal: "INT"
+      exit
+    end
+
+    # Exit gracefully, allowing any in-flight jobs to complete.  N.B. the
+    # process may still be force killed if it does not stop within 10-30
+    # seconds depending on the process manager that started this worker.
+    trap('TERM') do
+      log signal: "TERM"
+      self.stop = true
+    end
+
+    # ... this will then allow `at_exit` to run; handling any in-flight jobs
+    # gracefully
+    at_exit do
+      log finishing_que_jobs: true
+      Que.worker_count = 0
+      Que.mode = :off
+      Pliny::Metrics.backends.each do |metrics|
+        metrics.stop if metrics.respond_to?(:stop)
+      end
+      log que_jobs_finished: true
+    end
+  end
+end
+
+QueWorker.new.run

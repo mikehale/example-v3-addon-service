@@ -1,0 +1,18 @@
+{
+  "name": "myapp",
+  "description": "A new instance of myapp",
+
+  "env": {
+    "APP_NAME": "myapp",
+    "DEPLOYMENT": "production",
+    "APP_ENV": "production"
+  },
+
+  "scripts": {
+    "postdeploy": "bundle exec rake db:schema:load db:migrate"
+  },
+
+  "addons": [
+    "heroku-postgresql"
+  ]
+}
