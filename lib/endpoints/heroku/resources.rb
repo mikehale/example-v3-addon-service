@@ -5,6 +5,8 @@ module Endpoints
     namespace "/heroku/resources" do
       before do
         content_type :json, charset: 'utf-8'
+        version = env.fetch("HTTP_X_API_VERSION", "1").to_i
+        raise Pliny::Errors::NotFound unless version == 3
       end
 
       post do

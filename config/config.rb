@@ -33,7 +33,7 @@ module Config
   override :raise_errors,     false,        bool
   override :root,             File.expand_path("../../", __FILE__), string
   override :timeout,          10,           int
-  override :versioning,       false,        bool
+  override :versioning,       true,         bool
   override :que_hard_lock_interval, 10,     int
   override :que_worker_count, 1,            int
 end

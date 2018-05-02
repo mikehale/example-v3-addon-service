@@ -23,27 +23,40 @@ RSpec.describe Endpoints::Heroku::Resources do
   before do
     authorize ENV['HEROKU_USERNAME'], ENV['HEROKU_PASSWORD']
     header "Content-Type", "application/json"
+    header "Accept", "application/*+json; version=3"
   end
 
   describe "POST /heroku/resources" do
-    before do
-      post "/heroku/resources", MultiJson.encode(params)
-    end
-
     let(:last_json) { MultiJson.decode(last_response.body) }
 
-    it "requires v3 provisioning api"
+    context "with an incorrect accept header" do
+      before do
+        header "Accept", nil
+      end
+
+      it "responds 404" do
+        run
+        expect(last_response.status).to eq(404)
+      end
+    end
 
     it "responds 202" do
+      run
       expect(last_response.status).to eq(202)
     end
 
     it "returns the resource id" do
+      run
       expect(Resource[heroku_uuid: last_json['id']]).not_to be_nil
     end
 
     it "does not return config" do
+      run
       expect(last_json['config']).to be_nil
+    end
+
+    def run
+      post "/heroku/resources", MultiJson.encode(params)
     end
   end
 
@@ -51,16 +64,29 @@ RSpec.describe Endpoints::Heroku::Resources do
     let!(:resource) { Fabricate(:resource, plan: "starter") }
     let(:new_plan) { "advanced" }
 
-    before do
-      put "/heroku/resources/#{resource.heroku_uuid}", MultiJson.encode(plan: new_plan)
+    context "with an incorrect accept header" do
+      before do
+        header "Accept", nil
+      end
+
+      it "responds 404" do
+        run
+        expect(last_response.status).to eq(404)
+      end
     end
 
     it "responds 200" do
+      run
       expect(last_response.status).to eq(200)
     end
 
     it "updates the resource plan" do
+      run
       expect(Resource[uuid: resource.uuid].plan).to eq(new_plan)
+    end
+
+    def run
+      put "/heroku/resources/#{resource.heroku_uuid}", MultiJson.encode(plan: new_plan)
     end
 
   end
@@ -68,18 +94,30 @@ RSpec.describe Endpoints::Heroku::Resources do
   describe "DELETE /heroku/resources/:id" do
     let!(:resource) { Fabricate(:resource) }
 
-    before do
-      delete "/heroku/resources/#{resource.heroku_uuid}"
+    context "with an incorrect accept header" do
+      before do
+        header "Accept", nil
+      end
+
+      it "responds 404" do
+        run
+        expect(last_response.status).to eq(404)
+      end
     end
 
     it "responds 204" do
+      run
       expect(last_response.status).to eq(204)
     end
 
     it "destroys the resource" do
+      run
       expect(Resource[heroku_uuid: resource.heroku_uuid]).to be_nil
     end
 
+    def run
+      delete "/heroku/resources/#{resource.heroku_uuid}"
+    end
   end
 
 end

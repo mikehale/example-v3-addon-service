@@ -10,6 +10,7 @@ RSpec.describe Endpoints::Heroku::Resources do
   before do
     authorize ENV['HEROKU_USERNAME'], ENV['HEROKU_PASSWORD']
     header "Content-Type", "application/json"
+    env "HTTP_X_API_VERSION", "3"
   end
 
   describe "POST /heroku/resources" do
