@@ -11,7 +11,7 @@ gem "rack-ssl"
 gem "rack-timeout", "~> 0.4"
 gem "rake"
 gem "rollbar"
-gem "sequel", "~> 4.34"
+gem "sequel", "~> 5.0"
 gem "sequel-paranoid"
 gem "sequel_pg", "~> 1.6", require: "sequel"
 gem "sinatra", [">= 1.4", "< 3.0"], require: "sinatra/base"
@@ -21,6 +21,7 @@ gem "sucker_punch"
 gem "que", github: "heroku/que", branch: "transaction-tolerant-0.14.3"
 gem "activesupport", require: ["active_support", "active_support/inflector", "active_support/core_ext/numeric"]
 gem "excon"
+gem "attr_vault", "~> 2.1.0"
 
 group :development, :test do
   gem "foreman"

@@ -18,7 +18,7 @@ module Mediators::Resources
           name: name,
           region: region,
           callback_url: callback_url,
-          oauth_grant: oauth_grant # TODO: encrypt this
+          oauth_grant: oauth_grant
         )
       end
     end
